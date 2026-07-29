@@ -4,12 +4,9 @@ import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.minesky.mineskyrtp.MineSkyRTP;
 import net.minesky.mineskyrtp.config.ConfigManager;
 import net.minesky.mineskyrtp.cooldown.CooldownManager;
-import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.World;
+import org.bukkit.*;
 import org.bukkit.block.Block;
+import org.bukkit.block.data.Waterlogged;
 import org.bukkit.entity.Player;
 
 import java.util.Queue;
@@ -49,6 +46,9 @@ public class RTPManager {
         if (asyncTask != null) {
             asyncTask.cancel();
         }
+        for (Location loc : cache) {
+            releaseChunkLoaded(loc);
+        }
         cache.clear();
     }
 
@@ -81,6 +81,7 @@ public class RTPManager {
             try {
                 Location loc = findSafeLocationInChunk(world, chunk, targetX, targetZ);
                 if (loc != null) {
+                    keepChunkLoaded(loc);
                     cache.add(loc);
                 }
             } finally {
@@ -96,13 +97,15 @@ public class RTPManager {
         int blockX = x & 15;
         int blockZ = z & 15;
 
-        int startY = (world.getEnvironment() == World.Environment.NETHER) ? 120 : world.getMaxHeight() - 2;
-        int minY = world.getMinHeight();
+        String biomeName = chunk.getBlock(blockX, 64, blockZ).getBiome().name();
+        if (biomeName.contains("OCEAN") || biomeName.contains("RIVER") || biomeName.contains("SEA")) {
+            return null;
+        }
 
-        for (int y = startY; y >= minY; y--) {
-            Block ground = chunk.getBlock(blockX, y, blockZ);
-            if (ground.getType().isSolid()) {
-                if (y + 2 < world.getMaxHeight()) {
+        if (world.getEnvironment() == World.Environment.NETHER) {
+            for (int y = 120; y >= 32; y--) {
+                Block ground = chunk.getBlock(blockX, y, blockZ);
+                if (ground.getType().isSolid()) {
                     Block feet = chunk.getBlock(blockX, y + 1, blockZ);
                     Block head = chunk.getBlock(blockX, y + 2, blockZ);
 
@@ -110,6 +113,19 @@ public class RTPManager {
                         return new Location(world, x + 0.5, y + 1.0, z + 0.5);
                     }
                 }
+            }
+        } else {
+            int highestY = world.getHighestBlockYAt(x, z, HeightMap.WORLD_SURFACE);
+            if (highestY <= world.getMinHeight() || highestY >= world.getMaxHeight()) {
+                return null;
+            }
+
+            Block ground = chunk.getBlock(blockX, highestY - 1, blockZ);
+            Block feet = chunk.getBlock(blockX, highestY, blockZ);
+            Block head = chunk.getBlock(blockX, highestY + 1, blockZ);
+
+            if (isSafe(ground, feet, head)) {
+                return new Location(world, x + 0.5, highestY, z + 0.5);
             }
         }
         return null;
@@ -126,14 +142,50 @@ public class RTPManager {
             return false;
         }
 
-        if (gMat == Material.AIR || !gMat.isSolid()) {
+        if (gMat.isAir() || !gMat.isSolid() || ground.isLiquid()) {
+            return false;
+        }
+
+        if (ground.getBlockData() instanceof Waterlogged && ((Waterlogged) ground.getBlockData()).isWaterlogged()) {
+            return false;
+        }
+
+        if (feet.isLiquid() || head.isLiquid()) {
+            return false;
+        }
+
+        if (feet.getBlockData() instanceof Waterlogged && ((Waterlogged) feet.getBlockData()).isWaterlogged()) {
             return false;
         }
 
         boolean feetPassable = fMat.isAir() || feet.isPassable();
         boolean headPassable = hMat.isAir() || head.isPassable();
 
-        return feetPassable && !feet.isLiquid() && headPassable && !head.isLiquid();
+        return feetPassable && headPassable;
+    }
+
+    private void keepChunkLoaded(Location loc) {
+        World world = loc.getWorld();
+        if (world == null) return;
+        int chunkX = loc.getBlockX() >> 4;
+        int chunkZ = loc.getBlockZ() >> 4;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                world.addPluginChunkTicket(chunkX + dx, chunkZ + dz, plugin);
+            }
+        }
+    }
+
+    private void releaseChunkLoaded(Location loc) {
+        World world = loc.getWorld();
+        if (world == null) return;
+        int chunkX = loc.getBlockX() >> 4;
+        int chunkZ = loc.getBlockZ() >> 4;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                world.removePluginChunkTicket(chunkX + dx, chunkZ + dz, plugin);
+            }
+        }
     }
 
     public void executeRTP(Player player) {
@@ -172,6 +224,7 @@ public class RTPManager {
         world.getChunkAtAsync(targetX >> 4, targetZ >> 4).thenAccept(chunk -> {
             Location loc = findSafeLocationInChunk(world, chunk, targetX, targetZ);
             if (loc != null) {
+                keepChunkLoaded(loc);
                 performTeleport(player, loc);
                 fillCache();
             } else {
@@ -194,6 +247,9 @@ public class RTPManager {
                     player.playSound(location, config.getSound(), config.getSoundVolume(), config.getSoundPitch());
                 }
             }
+            plugin.getServer().getAsyncScheduler().runDelayed(plugin, task -> {
+                releaseChunkLoaded(location);
+            }, 5, TimeUnit.SECONDS);
         });
     }
 }
