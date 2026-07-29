@@ -1,0 +1,33 @@
+world: "world"
+min-radius: 500
+max-radius: 5000
+center-x: 0
+center-z: 0
+cache-size: 5
+generation-delay-seconds: 3
+cooldown-seconds: 30
+
+messages:
+  teleported: "&aTeleported to a random location! &7(X: %x%, Y: %y%, Z: %z%)"
+  cooldown: "&cYou must wait %time% seconds before using this command again!"
+  no-location: "&eSearching for a safe location, please wait..."
+  no-permission: "&cYou do not have permission to use this command."
+  only-players: "&cOnly players can execute this command."
+  world-not-found: "&cConfigured RTP world was not found!"
+
+sounds:
+  enabled: true
+  sound: "ENTITY_ENDERMAN_TELEPORT"
+  volume: 1.0
+  pitch: 1.0
+
+unsafe-blocks:
+  - LAVA
+  - WATER
+  - CACTUS
+  - FIRE
+  - SOUL_FIRE
+  - MAGMA_BLOCK
+  - VOID_AIR
+  - SWEET_BERRY_BUSHES
+  - WITHER_ROSE

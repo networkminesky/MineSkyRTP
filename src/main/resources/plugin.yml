@@ -1,0 +1,18 @@
+name: MineSkyRTP
+version: 1.0.0
+main: net.minesky.mineskyrtp.MineSkyRTP
+api-version: '1.20'
+folia-supported: true
+description: High-performance asynchronous RTP plugin designed for Folia and CanvasMC.
+commands:
+  rtp:
+    description: Teleport to a random safe location.
+    aliases: [wild]
+    permission: mineskyrtp.use
+permissions:
+  mineskyrtp.use:
+    default: true
+    description: Allows players to use /rtp and /wild.
+  mineskyrtp.bypass.cooldown:
+    default: op
+    description: Bypasses the RTP command cooldown.
