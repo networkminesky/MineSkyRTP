@@ -1,4 +1,4 @@
 # MineSkyRTP
-High-performance asynchronous RTP plugin designed for Folia and CanvasMC.
+High-performance asynchronous Random TP plugin for Folia and CanvasMC.
 
 Designed for 26.1.2
