@@ -125,9 +125,12 @@ public class RTPManager {
         final double currentAngle = angle;
         final double currentDist = distance;
 
+        final int finalTargetX = targetX;
+        final int finalTargetZ = targetZ;
+
         world.getChunkAtAsync(chunkX, chunkZ).thenAccept(chunk -> {
             try {
-                Location loc = findSafeLocationInChunk(world, chunk, targetX, targetZ);
+                Location loc = findSafeLocationInChunk(world, chunk, finalTargetX, finalTargetZ);
                 if (loc != null) {
                     keepChunkLoaded(loc);
                     cache.add(loc);
